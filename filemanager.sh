@@ -1,4 +1,4 @@
-#!/bin/bash -i 
+#!/bin/bash -i
 
 if [[ -z $1 ]]
 then
@@ -6,7 +6,7 @@ then
 #	exit 1
 	declare -ri HEIGHT=20
 else
-	declare -ri HEIGHT=$1 
+	declare -ri HEIGHT=$1
 fi
 
 declare -r LEFT_KEY='a'
@@ -14,6 +14,7 @@ declare -r RIGHT_KEY='d'
 declare -r UP_KEY='w'
 declare -r DOWN_KEY='s'
 declare -r EDIT_KEY='e'
+declare -r HIDE_KEY='h'
 declare -r QUIT_KEY='q'
 declare -r EXECUTE_KEY='x'
 
@@ -24,13 +25,13 @@ Documentation(){
 	echo -e '\E[31m'"$(basename $0) [HEIGHT=20]"
 	echo -e '\E[31m'"Where HEIGHT - amount of lines on your console"
 	echo -e '\E[35m'"Actions:"
-	echo -e "\tw - Up\n\ts - Down\n\ta - Up to 10 pos\n\td - Down to 10 pos\n\te - Edit\n\tx - Execute"
+	echo -e "\tw - Up\n\ts - Down\n\ta - Up to 10 pos\n\td - Down to 10 pos\n\te - Edit/Go to dir\n\tx - Execute\n\th - Toggle hidden elements"
 	tput sgr0
 	echo "Colors:"
 	echo -en '\E[32m'"[Folder]   "
 	tput sgr0
 	echo -en '\E[33m'"Executable*   "
-	tput sgr0	
+	tput sgr0
 	echo -e "Other files"
 }
 
@@ -41,26 +42,26 @@ Quit(){
 }
 
 MoveCursor(){
-	case "$action" in 
-	   "moveUp") 
+	case "$action" in
+	   "moveUp")
 		if [[ $cursor > 0 ]]; then
 			 let "cursor-=1"
 		 else
-			 let "cursor=$(($(ls -a | wc -l)-1))"
+			 let "cursor=$(($($listing | wc -l)))"
 		 fi ;;
-	   "moveDown") 
-		if [[ $cursor == $(($(ls -a | wc -l)-1)) ]]; then
+	   "moveDown")
+		if [[ $cursor -gt $(($($listing | wc -l)-1)) ]]; then
 			 let "cursor=0"
 		else
 			 let "cursor+=1"
 		fi ;;
-	   "moveRight") if [[ $cursor  -le $(($(ls -a | wc -l)-10)) ]]; then
+	   "moveRight") if [[ $cursor  -le $(($($listing | wc -l)-10)) ]]; then
 			let "cursor+=10"
 			fi;;
 	   "moveLeft")	if [[ $cursor -ge 10 ]]; then
 			let "cursor-=10"
 			fi;;
-	   "edit") 
+	   "edit")
 		if [[ -d ${List[$cursor]} ]]; then
 			 cd "${List[$cursor]}"
 			 let "cursor=0"
@@ -71,7 +72,7 @@ MoveCursor(){
 		if [[ -x ${List[$cursor]} ]]; then
 			stty echo
 			clear
-			./${List[$cursor]} 
+			./${List[$cursor]}
 			wait
 			read -n 1
 			clear
@@ -95,29 +96,32 @@ while true; do
 	        $LEFT_KEY)	   action="moveLeft";;
     	    $RIGHT_KEY)	   action="moveRight";;
             $EDIT_KEY)	   action="edit";;
+            $HIDE_KEY)	   action="hide";;
     	    $EXECUTE_KEY)  action="execute";;
             $QUIT_KEY)     action="quit";;
             "")	           ;;
         esac
-	MoveCursor
 	[[ $action == "quit" ]] && Quit
+    if [[ $action == "hide" ]]; then [[ -z $hidden ]] && hidden=1 || unset hidden; fi
+    [[ -z $hidden ]] && listing="ls -A" || listing="ls"
 	[[ -z $action ]] && continue
+	MoveCursor
 	clear
 	action=""
 	unset List
 	let "i=0"
 	echo -e '\E[36m'"Very simple Bash-filemanager. (C)--=Messiah=--"
 	tput sgr0
-
+    List[0]=".."
 	while read
 	do
-		List[$i]="$REPLY"
 		let "i+=1"
-	done< <(ls -a)
+		List[$i]="$REPLY"
+	done< <($listing)
 
 	let "page = (cursor / HEIGHT) * HEIGHT"
-	
-	for ((j=$page; j<$page + $HEIGHT; j++)) 
+
+	for ((j=$page; j<$page + $HEIGHT; j++))
 	do
 		item=${List[$j]}
 		if [[ $j == $cursor  ]]
@@ -128,7 +132,7 @@ while true; do
 			elif [[ -x $item ]]; then
 				echo -e ">>>"'\E[33m'"${item}*"
 				tput sgr0
-			else				
+			else
 				echo -e ">>>${item}"
 			fi
 		else
